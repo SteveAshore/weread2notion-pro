@@ -33,6 +33,8 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       YEAR: ${{ vars.YEAR }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
