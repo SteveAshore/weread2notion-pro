@@ -3,6 +3,8 @@ import os
 import re
 import time
 
+logger = logging.getLogger(__name__)
+
 from notion_client import Client
 import pendulum
 from retrying import retry
