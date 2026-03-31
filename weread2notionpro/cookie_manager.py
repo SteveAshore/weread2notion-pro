@@ -73,17 +73,107 @@ class CookieUtil:
 class CookieCloudDecryptor:
     """
     CookieCloud 解密器
-    支持 AES-128-CBC 解密（MD5 密钥模式）
+    支持 CryptoJS/OpenSSL 兼容的 AES 解密（EVP_BytesToKey 密钥派生）
+    
+    参考实现:
+    - CookieCloud 官方: https://github.com/easychen/CookieCloud
+    - obsidian-weread-plugin: https://github.com/zhaohongxuan/obsidian-weread-plugin
     """
+
+    @staticmethod
+    def _evp_bytes_to_key(password: bytes, salt: bytes, key_len: int = 32, iv_len: int = 16, 
+                          iterations: int = 1, hash_func=hashlib.md5) -> tuple:
+        """
+        实现 OpenSSL EVP_BytesToKey 密钥派生算法
+        
+        这是 CryptoJS AES 加密使用的标准密钥派生方式
+        
+        参数:
+            password: 密码字节
+            salt: 盐值字节（8字节）
+            key_len: 派生密钥长度（默认32字节用于AES-256）
+            iv_len: 派生IV长度（默认16字节）
+            iterations: 迭代次数（CryptoJS默认1）
+            hash_func: 哈希函数（默认MD5）
+            
+        返回:
+            (key, iv) 元组
+        """
+        derived = b''
+        block = b''
+        
+        while len(derived) < key_len + iv_len:
+            # 每次迭代：hash(前一次结果 + 密码 + 盐)
+            hasher = hash_func()
+            hasher.update(block + password + salt)
+            block = hasher.digest()
+            
+            # 多轮迭代（CryptoJS默认1轮，但OpenSSL兼容模式支持更多）
+            for _ in range(1, iterations):
+                block = hash_func(block).digest()
+                
+            derived += block
+            
+        return derived[:key_len], derived[key_len:key_len + iv_len]
+
+    @staticmethod
+    def _decrypt_cryptojs_aes(password: str, ciphertext_b64: str) -> Optional[bytes]:
+        """
+        解密 CryptoJS.AES.encrypt() 加密的数据
+        
+        密文格式: base64("Salted__" + 8字节salt + ciphertext)
+        
+        参数:
+            password: 解密密钥（MD5(uuid+"-"+password)[:16]）
+            ciphertext_b64: base64编码的密文
+            
+        返回:
+            解密后的原始字节数据，失败返回 None
+        """
+        try:
+            # Base64 解码
+            encrypted_data = base64.b64decode(ciphertext_b64)
+            
+            # 检查 Salted__ 前缀
+            if len(encrypted_data) < 16 or encrypted_data[:8] != b'Salted__':
+                logger.error(f'无效的密文格式，缺少 Salted__ 前缀')
+                return None
+                
+            # 提取 salt 和实际密文
+            salt = encrypted_data[8:16]
+            ciphertext = encrypted_data[16:]
+            
+            logger.debug(f'提取到 salt: {salt.hex()}, 密文长度: {len(ciphertext)}')
+            
+            # 使用 EVP_BytesToKey 派生 key 和 iv
+            key, iv = CookieCloudDecryptor._evp_bytes_to_key(
+                password.encode('utf-8'), 
+                salt,
+                key_len=32,  # AES-256
+                iv_len=16
+            )
+            
+            logger.debug(f'派生密钥长度: {len(key)}, IV长度: {len(iv)}')
+            
+            # AES-256-CBC 解密
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            decrypted_padded = cipher.decrypt(ciphertext)
+            decrypted_data = unpad(decrypted_padded, AES.block_size)
+            
+            return decrypted_data
+            
+        except Exception as e:
+            logger.error(f'AES 解密失败: {e}')
+            return None
 
     @staticmethod
     def decrypt_cookies(uuid: str, encrypted: str, password: str) -> Optional[Dict]:
         """
         解密 CookieCloud 返回的加密数据
 
-        加密方式:
+        加密方式（与 obsidian-weread-plugin 保持一致）:
         - 密钥 = MD5(uuid + "-" + password) 的前16个字符
-        - 算法 = AES-128-CBC
+        - 算法 = CryptoJS.AES (OpenSSL EVP_BytesToKey + AES-256-CBC)
         - 编码 = base64
 
         返回: 解密后的 Cookie 字典或 None
@@ -91,36 +181,17 @@ class CookieCloudDecryptor:
         try:
             # 生成解密密钥（与 obsidian 插件保持一致）
             key_source = f"{uuid}-{password}"
-            md5_hash = hashlib.md5(key_source.encode()).hexdigest()
-            key = md5_hash[:16].encode()  # 取前16个字符
-            logger.debug(f'解密密钥生成: MD5({key_source})[:16] = {md5_hash[:16]}')
+            the_key = hashlib.md5(key_source.encode()).hexdigest()[:16]
+            logger.debug(f'解密密钥: MD5({key_source})[:16] = {the_key}')
 
-            # Base64 解码
-            try:
-                encrypted_data = base64.b64decode(encrypted)
-                logger.debug(f'Base64 解码成功，数据长度: {len(encrypted_data)}')
-            except Exception as e:
-                logger.error(f'Base64 解码失败: {e}')
+            # 使用 EVP_BytesToKey 派生方式解密（CryptoJS 兼容）
+            decrypted_data = CookieCloudDecryptor._decrypt_cryptojs_aes(the_key, encrypted)
+            
+            if not decrypted_data:
+                logger.error('CookieCloud 解密失败')
                 return None
-
-            # 提取 IV 和密文
-            if len(encrypted_data) < 16:
-                logger.error(f'加密数据太短，无法提取 IV: {len(encrypted_data)}')
-                return None
-
-            iv = encrypted_data[:16]
-            ciphertext = encrypted_data[16:]
-            logger.debug(f'IV 长度: {len(iv)}, 密文长度: {len(ciphertext)}')
-
-            # AES 解密
-            try:
-                cipher = AES.new(key, AES.MODE_CBC, iv)
-                decrypted_padded = cipher.decrypt(ciphertext)
-                decrypted_data = unpad(decrypted_padded, AES.block_size)
-                logger.debug(f'AES 解密成功，数据长度: {len(decrypted_data)}')
-            except Exception as e:
-                logger.error(f'AES 解密失败: {e}')
-                return None
+                
+            logger.debug(f'AES 解密成功，数据长度: {len(decrypted_data)}')
 
             # 解析 JSON
             try:
