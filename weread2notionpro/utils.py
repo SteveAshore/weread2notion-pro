@@ -25,6 +25,8 @@ MAX_LENGTH = (
 
 
 def get_heading(level, content):
+    if content is None:
+        content = ""
     if level == 1:
         heading = "heading_1"
     elif level == 2:
@@ -54,10 +56,14 @@ def get_table_of_contents():
 
 
 def get_title(content):
+    if content is None:
+        content = ""
     return {"title": [{"type": "text", "text": {"content": content[:MAX_LENGTH]}}]}
 
 
 def get_rich_text(content):
+    if content is None:
+        content = ""
     return {"rich_text": [{"type": "text", "text": {"content": content[:MAX_LENGTH]}}]}
 
 
@@ -100,6 +106,8 @@ def get_number(number):
 
 
 def get_quote(content):
+    if content is None:
+        content = ""
     return {
         "type": "quote",
         "quote": {
@@ -115,6 +123,8 @@ def get_quote(content):
 
 
 def get_block(content,type,show_color, style, colorStyle, reviewId):
+    if content is None:
+        content = ""
     color = "default"
     if show_color:
         # 根据划线颜色设置文字的颜色
@@ -227,10 +237,14 @@ def get_properties(dict1, dict2):
             continue
         property = None
         if type == TITLE:
+            if value is None:
+                value = ""
             property = {
                 "title": [{"type": "text", "text": {"content": value[:MAX_LENGTH]}}]
             }
         elif type == RICH_TEXT:
+            if value is None:
+                value = ""
             property = {
                 "rich_text": [{"type": "text", "text": {"content": value[:MAX_LENGTH]}}]
             }
