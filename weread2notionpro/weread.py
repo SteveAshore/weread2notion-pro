@@ -30,7 +30,8 @@ def get_bookmark_list(page_id, bookId):
         for x in results
     }
     dict2 = {get_rich_text_from_result(x, "blockId"): x.get("id") for x in results}
-    bookmarks = weread_api.get_bookmark_list(bookId)
+    bookmark_data = weread_api.get_bookmark_list(bookId)
+    bookmarks = bookmark_data.get("updated", []) if isinstance(bookmark_data, dict) else bookmark_data
     for i in bookmarks:
         if i.get("bookmarkId") in dict1:
             i["blockId"] = dict1.pop(i.get("bookmarkId"))
@@ -56,7 +57,8 @@ def get_review_list(page_id,bookId):
         for x in results
     }
     dict2 = {get_rich_text_from_result(x, "blockId"): x.get("id") for x in results}
-    reviews = weread_api.get_review_list(bookId)
+    review_data = weread_api.get_review_list(bookId)
+    reviews = review_data.get("reviews", []) if isinstance(review_data, dict) else review_data
     for i in reviews:
         if i.get("reviewId") in dict1:
             i["blockId"] = dict1.pop(i.get("reviewId"))
