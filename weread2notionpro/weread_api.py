@@ -109,11 +109,31 @@ class WeReadApi:
             initial_state = json.loads(match.group(1))
             shelf_data = initial_state.get('shelf', {})
             
+            # 从 booksAndArchives 提取书籍（books 和 bookProgress 可能为空）
+            books_and_archives = shelf_data.get('booksAndArchives', [])
+            # 过滤出书籍类型（type 为 book 或有 bookId 的项）
+            books = [item for item in books_and_archives 
+                     if item.get('type') == 'book' or 'bookId' in item]
+            
+            # 构建 bookProgress（从书籍数据中提取阅读进度）
+            book_progress = []
+            for book in books:
+                progress = {
+                    'bookId': book.get('bookId'),
+                    'readingTime': book.get('readingTime', 0),
+                }
+                # 添加其他可能的进度字段
+                if 'readUpdateTime' in book:
+                    progress['readUpdateTime'] = book.get('readUpdateTime')
+                if 'finishReading' in book:
+                    progress['finishReading'] = book.get('finishReading')
+                book_progress.append(progress)
+            
             # 转换为与原来 API 一致的格式
             result = {
-                'books': shelf_data.get('books', []),
+                'books': books,
                 'archive': shelf_data.get('archive', []),
-                'bookProgress': shelf_data.get('bookProgress', []),
+                'bookProgress': book_progress,
             }
             
             logger.info(f"成功获取书架: {len(result['books'])} 本书, {len(result['archive'])} 个分类")
@@ -268,6 +288,10 @@ class WeReadApi:
             errcode = r.json().get("errcode", 0)
             self.handle_errcode(errcode)
             raise Exception(f"Could not get book info {r.text}")
+
+    def get_url(self, bookId):
+        """获取书籍详情页 URL"""
+        return f"https://weread.qq.com/web/reader/{bookId}"
 
     def get_data(self, book):
         """获取书籍完整数据（标注、笔记、章节等）"""
