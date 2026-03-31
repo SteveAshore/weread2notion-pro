@@ -226,7 +226,7 @@ class WeReadApi:
             return {}
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
-    def get_bookmarklist(self, bookId):
+    def get_bookmark_list(self, bookId):
         """获取书籍标注列表"""
         self.session.get(WEREAD_URL)
         r = self.session.get(WEREAD_BOOKMARKLIST_URL, params={"bookId": bookId})
@@ -297,7 +297,7 @@ class WeReadApi:
         """获取书籍完整数据（标注、笔记、章节等）"""
         book_id = book["bookId"]
         book_info = self.get_bookinfo(book_id)
-        bookmark_list = self.get_bookmarklist(book_id)
+        bookmark_list = self.get_bookmark_list(book_id)
         summary = bookmark_list.get("updated", [])
         reviews = self.get_review_list(book_id).get("reviews", [])
         
