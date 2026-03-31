@@ -1,6 +1,6 @@
 requests
 requests-oauthlib
-notion-client<3.0
+notion-client<2.3
 github-heatmap
 retrying
 pendulum
