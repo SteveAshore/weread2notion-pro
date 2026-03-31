@@ -27,17 +27,17 @@ def insert_book_to_notion(books, index, bookId):
     readInfo.update(readInfo.get("bookInfo", {}))
     book.update(readInfo)
     book["阅读进度"] = (
-        100 if (book.get("markedStatus") == 4) else book.get("readingProgress", 0)
+        100 if (book.get("markedStatus") == 4) else (book.get("readingProgress") or 0)
     ) / 100
     markedStatus = book.get("markedStatus")
     status = "想读"
     if markedStatus == 4:
         status = "已读"
-    elif book.get("readingTime", 0) >= 60:
+    elif (book.get("readingTime") or 0) >= 60:
         status = "在读"
     book["阅读状态"] = status
-    book["阅读时长"] = book.get("readingTime")
-    book["阅读天数"] = book.get("totalReadDay")
+    book["阅读时长"] = book.get("readingTime") or 0
+    book["阅读天数"] = book.get("totalReadDay") or 0
     book["评分"] = book.get("newRating")
     if book.get("newRatingDetail") and book.get("newRatingDetail").get("myRating"):
         book["我的评分"] = rating.get(book.get("newRatingDetail").get("myRating"))
@@ -50,7 +50,7 @@ def insert_book_to_notion(books, index, bookId):
     )
     book["开始阅读时间"] = book.get("beginReadingDate")
     book["最后阅读时间"] = book.get("lastReadingDate")
-    cover = book.get("cover").replace("/s_", "/t7_")
+    cover = (book.get("cover") or "").replace("/s_", "/t7_")
     if not cover or not cover.strip() or not cover.startswith("http"):
         cover = BOOK_ICON_URL
     if bookId not in notion_books:
@@ -63,7 +63,7 @@ def insert_book_to_notion(books, index, bookId):
             notion_helper.get_relation_id(
                 x, notion_helper.author_database_id, USER_ICON_URL
             )
-            for x in book.get("author").split(" ")
+            for x in (book.get("author") or "").split(" ") if x
         ]
         if book.get("categories"):
             book["分类"] = [
