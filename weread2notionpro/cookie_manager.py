@@ -29,7 +29,7 @@ class Cookie:
 
 
 class CookieUtil:
-    """Cookie 解析��具"""
+    """Cookie 解析工具"""
 
     @staticmethod
     def parse_cookie_string(cookie_string: str) -> Dict[str, str]:

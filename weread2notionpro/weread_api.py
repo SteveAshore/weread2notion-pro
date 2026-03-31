@@ -18,14 +18,14 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 WEREAD_URL = "https://weread.qq.com/"
-WEREAD_NOTEBOOKS_URL = "https://i.weread.qq.com/user/notebooks"
-WEREAD_BOOKMARKLIST_URL = "https://i.weread.qq.com/book/bookmarklist"
-WEREAD_CHAPTER_INFO = "https://i.weread.qq.com/book/chapterInfos"
-WEREAD_READ_INFO_URL = "https://i.weread.qq.com/book/readinfo"
-WEREAD_REVIEW_LIST_URL = "https://i.weread.qq.com/review/list"
-WEREAD_BOOK_INFO = "https://i.weread.qq.com/book/info"
-WEREAD_READDATA_DETAIL = "https://i.weread.qq.com/readdata/detail"
-WEREAD_HISTORY_URL = "https://i.weread.qq.com/readdata/summary?synckey=0"
+WEREAD_NOTEBOOKS_URL = "https://weread.qq.com/api/user/notebook"
+WEREAD_BOOKMARKLIST_URL = "https://weread.qq.com/web/book/bookmarklist"
+WEREAD_CHAPTER_INFO = "https://weread.qq.com/web/book/chapterInfos"
+WEREAD_READ_INFO_URL = "https://weread.qq.com/web/book/readinfo"
+WEREAD_REVIEW_LIST_URL = "https://weread.qq.com/web/review/list"
+WEREAD_BOOK_INFO = "https://weread.qq.com/web/book/info"
+WEREAD_READDATA_DETAIL = "https://weread.qq.com/web/readdata/detail"
+WEREAD_HISTORY_URL = "https://weread.qq.com/web/readdata/summary?synckey=0"
 WEREAD_READ_TIME_URL = "https://weread.qq.com/web/readdata"
 
 
@@ -38,7 +38,6 @@ class WeReadApi:
         self.session.cookies = self.cookie_manager.get_cookiejar()
 
     # ✅ 删除旧的 try_get_cloud_cookie、get_cookie、parse_cookie_string 方法
-
     def refresh_cookie(self) -> bool:
         """
         刷新 Cookie
@@ -67,18 +66,62 @@ class WeReadApi:
         else:
             logger.warning('刷新后的 Cookie 仍然无效')
             return False
+    
+    def get_headers(self):
+        cookies = self.cookie_manager.get_cookies()
+
+        # 根据平台选择合适的 User-Agent（与原代码一致的短 UA）
+        user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
+
+        headers = {
+            'User-Agent': user_agent,
+            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+        }
+
+        return headers
+
 
     def get_bookshelf(self):
+        """获取书架（从 /web/shelf 页面解析 window.__INITIAL_STATE__）"""
+        import re
+        import json
+        
         self.session.get(WEREAD_URL)
-        r = self.session.get(
-            "https://i.weread.qq.com/shelf/sync?synckey=0&teenmode=0&album=1&onlyBookid=0"
-        )
-        if r.ok:
-            return r.json()
-        else:
-            errcode = r.json().get("errcode", 0)
+        r = self.session.get("https://weread.qq.com/web/shelf")
+        
+        if not r.ok:
+            errcode = r.json().get("errcode", 0) if r.text else 0
             self.handle_errcode(errcode)
             raise Exception(f"Could not get bookshelf {r.text}")
+        
+        # 从 HTML 中解析 window.__INITIAL_STATE__
+        html = r.text
+        match = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.+?});', html, re.DOTALL)
+        
+        if not match:
+            logger.error('无法从页面中解析 window.__INITIAL_STATE__')
+            raise Exception("Could not parse shelf data from HTML")
+        
+        try:
+            initial_state = json.loads(match.group(1))
+            shelf_data = initial_state.get('shelf', {})
+            
+            # 转换为与原来 API 一致的格式
+            result = {
+                'books': shelf_data.get('books', []),
+                'archive': shelf_data.get('archive', []),
+                'bookProgress': shelf_data.get('bookProgress', []),
+            }
+            
+            logger.info(f"成功获取书架: {len(result['books'])} 本书, {len(result['archive'])} 个分类")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f'解析 window.__INITIAL_STATE__ 失败: {e}')
+            raise Exception(f"Failed to parse shelf JSON: {e}")
 
     def handle_errcode(self, errcode):
         """处理 WeRead API 错误码"""
