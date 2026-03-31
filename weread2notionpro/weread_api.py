@@ -27,6 +27,7 @@ WEREAD_BOOK_INFO = "https://i.weread.qq.com/book/info"
 WEREAD_READDATA_DETAIL = "https://i.weread.qq.com/readdata/detail"
 WEREAD_HISTORY_URL = "https://i.weread.qq.com/readdata/summary?synckey=0"
 WEREAD_READ_TIME_URL = "https://weread.qq.com/web/readdata"
+WEREAD_READ_TIME_SYNC_URL = "https://i.weread.qq.com/readdata/summary"
 
 
 class WeReadApi:
@@ -106,9 +107,32 @@ class WeReadApi:
             self.handle_errcode(errcode)
             raise Exception(f"Could not get notebook list {r.text}")
 
+    def get_api_data(self):
+        """
+        获取阅读时间 API 数据（用于 read_time 同步）
+        
+        返回:
+            包含 readTimes 等字段的字典
+        """
+        logger.info('获取阅读时间 API 数据...')
+        
+        # 访问主页预热
+        self.session.get(WEREAD_URL)
+        
+        # 调用阅读数据汇总接口
+        r = self.session.get(WEREAD_HISTORY_URL)
+        if r.ok:
+            data = r.json()
+            logger.info(f'获取阅读时间数据成功')
+            return data
+        else:
+            errcode = r.json().get("errcode", 0)
+            self.handle_errcode(errcode)
+            raise Exception(f"获取阅读时间数据失败: {r.text}")
+
     def get_read_time_history(self, year: int = None) -> dict:
         """
-        获取阅读时间历史数据
+        获取阅读时间历史数据（用于热力图生成）
         
         参数:
             year: 年份，默认当前年
@@ -124,40 +148,21 @@ class WeReadApi:
         logger.info(f'获取 {year} 年的阅读时间历史...')
         
         try:
-            # 使用正确的请求头访问阅读数据接口
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'zh-CN,zh;q=0.9',
-                'Referer': 'https://weread.qq.com/web/shelf',
-            }
+            # 使用 read_time 相同的 API 获取数据
+            data = self.get_api_data()
+            read_times = {}
             
-            # 先访问主页获取有效的 session
-            self.session.get(WEREAD_URL, headers=headers)
-            
-            # 调用阅读数据接口（使用 web 端 URL）
-            r = self.session.get(WEREAD_READ_TIME_URL, headers=headers)
-            
-            if r.ok:
-                data = r.json()
-                read_times = {}
-                
-                # 解析阅读时间数据
-                if "readTimes" in data:
-                    for timestamp, seconds in data["readTimes"].items():
-                        dt = datetime.fromtimestamp(int(timestamp))
-                        if dt.year == year:
-                            date_str = dt.strftime("%Y-%m-%d")
-                            minutes = round(int(seconds) / 60.0, 2)
-                            read_times[date_str] = minutes
-                            
-                logger.info(f'获取到 {len(read_times)} 天的阅读时间数据')
-                return read_times
-            else:
-                errcode = r.json().get("errcode", 0)
-                self.handle_errcode(errcode)
-                logger.error(f'获取阅读时间历史失败: {r.text}')
-                return {}
+            # 解析阅读时间数据
+            if "readTimes" in data:
+                for timestamp, seconds in data["readTimes"].items():
+                    dt = datetime.fromtimestamp(int(timestamp))
+                    if dt.year == year:
+                        date_str = dt.strftime("%Y-%m-%d")
+                        minutes = round(int(seconds) / 60.0, 2)
+                        read_times[date_str] = minutes
+                        
+            logger.info(f'获取到 {len(read_times)} 天的阅读时间数据')
+            return read_times
         except Exception as e:
             logger.error(f'获取阅读时间历史异常: {e}')
             return {}
