@@ -325,6 +325,91 @@ class CookieValidator:
         self.cookies = cookies
         self.timeout = timeout
 
+    def _parse_set_cookie(self, set_cookie_header: str) -> Dict[str, str]:
+        """
+        解析 Set-Cookie 响应头，提取 cookie name=value
+        
+        支持多个 cookie（以逗号分隔的情况）
+        """
+        new_cookies = {}
+        if not set_cookie_header:
+            return new_cookies
+            
+        # 处理可能包含多个 cookie 的情况
+        # 注意：简单的 split(',') 可能会出问题，因为 expires 属性也包含逗号
+        # 这里使用简化的解析，只提取 name=value 部分
+        import re
+        
+        # 匹配 cookie name=value 对（在第一个分号之前）
+        cookie_pattern = r'([^=;]+)=([^;]+)'
+        matches = re.findall(cookie_pattern, set_cookie_header)
+        
+        for name, value in matches:
+            name = name.strip()
+            value = value.strip()
+            # 只保留微信读书相关的 cookie
+            if name.startswith('wr_'):
+                new_cookies[name] = value
+                
+        return new_cookies
+
+    def _refresh_cookie(self, session: requests.Session) -> bool:
+        """
+        主动刷新 Cookie（使用 wr_rt 获取新的 wr_skey）
+        
+        参考 obsidian-weread-plugin 的 refreshCookie 实现
+        """
+        try:
+            logger.info('正在主动刷新 Cookie...')
+            
+            # 使用 HEAD 请求访问主页，检查 Set-Cookie
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+                'Cookie': CookieUtil.cookies_to_string(self.cookies)
+            }
+            
+            resp = session.head(
+                self.WEREAD_BASE_URL,
+                headers=headers,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            
+            # 检查 Set-Cookie
+            set_cookie = resp.headers.get('set-cookie') or resp.headers.get('Set-Cookie')
+            if set_cookie:
+                logger.debug(f'刷新 Cookie 收到 Set-Cookie: {set_cookie[:200]}...')
+                new_cookies = self._parse_set_cookie(set_cookie)
+                if new_cookies:
+                    self.cookies.update(new_cookies)
+                    logger.info(f'Cookie 刷新成功，更新字段: {list(new_cookies.keys())}')
+                    # 使用新 Cookie 重新验证
+                    return self.verify_cookie_validity()
+            
+            # 如果 HEAD 没有返回 Set-Cookie，尝试 GET 请求
+            resp = session.get(
+                self.WEREAD_BASE_URL,
+                headers=headers,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            
+            set_cookie = resp.headers.get('set-cookie') or resp.headers.get('Set-Cookie')
+            if set_cookie:
+                logger.debug(f'GET 刷新 Cookie 收到 Set-Cookie: {set_cookie[:200]}...')
+                new_cookies = self._parse_set_cookie(set_cookie)
+                if new_cookies:
+                    self.cookies.update(new_cookies)
+                    logger.info(f'Cookie 刷新成功，更新字段: {list(new_cookies.keys())}')
+                    return self.verify_cookie_validity()
+            
+            logger.warning('主动刷新 Cookie 未收到 Set-Cookie 响应')
+            return False
+            
+        except Exception as e:
+            logger.error(f'主动刷新 Cookie 失败: {e}')
+            return False
+
     def verify_cookie_validity(self) -> bool:
         """
         验证 Cookie 是否有效
@@ -384,6 +469,18 @@ class CookieValidator:
             logger.debug(f'响应头: {dict(response.headers)}')
             if response.text:
                 logger.debug(f'响应内容: {response.text[:500]}...')
+            
+            # 检查响应头中的 Set-Cookie（服务器可能返回刷新后的 Cookie）
+            set_cookie_header = response.headers.get('set-cookie') or response.headers.get('Set-Cookie')
+            if set_cookie_header:
+                logger.debug(f'收到 Set-Cookie: {set_cookie_header[:200]}...')
+                # 解析并更新 Cookie
+                new_cookies = self._parse_set_cookie(set_cookie_header)
+                if new_cookies:
+                    self.cookies.update(new_cookies)
+                    logger.info(f'从响应中刷新 Cookie，更新字段: {list(new_cookies.keys())}')
+                    # 使用新 Cookie 重新验证
+                    return self.verify_cookie_validity()
 
             if response.status_code == 200:
                 data = response.json()
@@ -399,6 +496,25 @@ class CookieValidator:
                     else:
                         logger.warning(f'Cookie 验证失败（错误码: {errcode}, 信息: {errmsg}）')
                     return False
+            
+            # 处理 401 状态码
+            if response.status_code == 401:
+                try:
+                    data = response.json()
+                    errcode = data.get('errcode', 0)
+                    errmsg = data.get('errmsg', '')
+                    
+                    # -2013 鉴权失败：尝试主动刷新 Cookie
+                    if errcode == -2013:
+                        logger.warning(f'收到 -2013 鉴权失败，尝试主动刷新 Cookie...')
+                        return self._refresh_cookie(session)
+                    elif errcode == -2012:
+                        logger.warning(f'Cookie 已过期（-2012）')
+                    else:
+                        logger.warning(f'Cookie 验证失败（错误码: {errcode}, 信息: {errmsg}）')
+                except:
+                    pass
+                return False
 
             logger.warning(f'Cookie 验证返回状态码: {response.status_code}')
             return False
