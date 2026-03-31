@@ -32,6 +32,14 @@ jobs:
       REF: ${{ github.ref }}
       REPOSITORY: ${{ github.repository }}
       YEAR: ${{ vars.YEAR }}
+      # 颜色配置
+      BACKGROUND_COLOR: ${{ vars.background_color || '#FFFFFF' }}
+      TRACK_COLOR: ${{ vars.track_color || '#ACE7AE' }}
+      SPECIAL_COLOR1: ${{ vars.special_color || '#69C16E' }}
+      SPECIAL_COLOR2: ${{ vars.special_color2 || '#549F57' }}
+      DOM_COLOR: ${{ vars.dom_color || '#EBEDF0' }}
+      TEXT_COLOR: ${{ vars.text_color || '#000000' }}
+      NAME: ${{ secrets.NAME || '微信读书' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,7 +51,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      # ✅ 新增：在同步前验证 Cookie
+          pip install -e .  # 安装本地包
+      # ✅ 验证 Cookie
       - name: Verify Cookie
         run: |
           python -c "
@@ -63,9 +72,19 @@ jobs:
       - name: Set default year if not provided
         run: echo "YEAR=$(date +"%Y")" >> $GITHUB_ENV
         if: env.YEAR == ''
-      - name: weread heatmap
+      # ✅ 使用 Python 生成热力图（替代 github_heatmap）
+      - name: Generate WeRead Heatmap
         run: |
-          github_heatmap weread  --year $YEAR  --me "${{secrets.NAME}}" --without-type-name --background-color=${{ vars.background_color||'#FFFFFF'}} --track-color=${{ vars.track_color||'#ACE7AE'}} --special-color1=${{ vars.special_color||'#69C16E'}} --special-color2=${{ vars.special_color2||'#549F57'}} --dom-color=${{ vars.dom_color||'#EBEDF0'}} --text-color=${{ vars.text_color||'#000000'}}
+          python -m weread2notionpro.heatmap_generator \
+            --year ${YEAR:-$(date +"%Y")} \
+            --output "OUT_FOLDER/weread.svg" \
+            --title "${NAME}阅读热力图" \
+            --background-color "$BACKGROUND_COLOR" \
+            --track-color "$TRACK_COLOR" \
+            --special-color1 "$SPECIAL_COLOR1" \
+            --special-color2 "$SPECIAL_COLOR2" \
+            --dom-color "$DOM_COLOR" \
+            --text-color "$TEXT_COLOR"
       - name: Rename weread.svg to a random name
         run: |
           cd OUT_FOLDER
@@ -84,4 +103,3 @@ jobs:
       - name: read time sync
         run: |
           read_time
-      
