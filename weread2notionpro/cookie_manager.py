@@ -341,27 +341,49 @@ class CookieValidator:
             logger.warning('Cookie 中缺少 wr_vid（用户ID），可能未登录')
 
         try:
-            # 验证端点：获取笔记本列表
+            # 首先访问主页建立会话（某些 Cookie 需要先访问主页才能生效）
+            session = requests.Session()
+            cookie_str = CookieUtil.cookies_to_string(self.cookies)
+            
             # 使用与 obsidian-weread-plugin 一致的请求头
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
                 'Accept': 'application/json, text/plain, */*',
                 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
                 'Accept-Encoding': 'gzip, deflate',
-                'Cookie': CookieUtil.cookies_to_string(self.cookies)
+                'Cookie': cookie_str
             }
+            
+            # 预热请求：先访问主页
+            logger.debug(f'预热请求: {self.WEREAD_BASE_URL}')
+            warmup_resp = session.get(
+                self.WEREAD_BASE_URL,
+                headers={'User-Agent': headers['User-Agent'], 'Cookie': cookie_str},
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            logger.debug(f'预热响应: HTTP {warmup_resp.status_code}')
 
             # 使用与 obsidian-weread-plugin 一致的验证端点
             verify_url = f"{self.WEREAD_API_URL}/api/user/notebook"
             logger.debug(f'验证 URL: {verify_url}')
             logger.debug(f'请求 Cookie 字段: {list(self.cookies.keys())}')
-            response = requests.get(
+            
+            # 打印 Cookie 字符串（脱敏）用于调试
+            cookie_str = CookieUtil.cookies_to_string(self.cookies)
+            logger.debug(f'Cookie 字符串长度: {len(cookie_str)}')
+            
+            response = session.get(
                 verify_url,
                 headers=headers,
-                timeout=self.timeout
+                timeout=self.timeout,
+                allow_redirects=True
             )
 
             logger.debug(f'验证响应状态: HTTP {response.status_code}')
+            logger.debug(f'响应头: {dict(response.headers)}')
+            if response.text:
+                logger.debug(f'响应内容: {response.text[:500]}...')
 
             if response.status_code == 200:
                 data = response.json()
