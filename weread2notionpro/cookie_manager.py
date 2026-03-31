@@ -430,12 +430,16 @@ class CookieValidator:
             session = requests.Session()
             cookie_str = CookieUtil.cookies_to_string(self.cookies)
             
-            # 使用与 obsidian-weread-plugin 一致的请求头
+            # 使用与浏览器一致的请求头（关键：Referer 必须正确）
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'zh-CN,zh;q=0.9',
                 'Accept-Encoding': 'gzip, deflate',
+                'Referer': 'https://weread.qq.com/web/shelf',  # 关键：Referer 必须来自书架页面
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
                 'Cookie': cookie_str
             }
             
