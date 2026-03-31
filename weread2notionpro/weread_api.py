@@ -107,6 +107,7 @@ class WeReadApi:
             self.handle_errcode(errcode)
             raise Exception(f"Could not get notebook list {r.text}")
 
+    @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def get_api_data(self):
         """
         获取阅读时间 API 数据（用于 read_time 同步）
@@ -121,14 +122,33 @@ class WeReadApi:
         
         # 调用阅读数据汇总接口
         r = self.session.get(WEREAD_HISTORY_URL)
+        
+        # 检查是否需要刷新 Cookie
+        if not r.ok:
+            try:
+                data = r.json()
+                errcode = data.get("errcode", 0)
+                if errcode in [-2012, -2010, -2013]:
+                    logger.warning(f'Cookie 异常 [{errcode}]，尝试刷新...')
+                    if self.refresh_cookie():
+                        # 刷新成功，重新请求（retry 会自动重试）
+                        raise Exception(f"需要重试")
+                    else:
+                        raise Exception(f"Cookie 刷新失败，无法获取阅读时间数据")
+            except Exception as e:
+                if "需要重试" in str(e):
+                    raise
+                logger.error(f"解析错误响应失败: {e}")
+        
         if r.ok:
             data = r.json()
             logger.info(f'获取阅读时间数据成功')
             return data
         else:
-            errcode = r.json().get("errcode", 0)
-            self.handle_errcode(errcode)
-            raise Exception(f"获取阅读时间数据失败: {r.text}")
+            data = r.json() if r.text else {}
+            errcode = data.get("errcode", 0)
+            errmsg = data.get("errmsg", "未知错误")
+            raise Exception(f"获取阅读时间数据失败: [{errcode}] {errmsg}")
 
     def get_read_time_history(self, year: int = None) -> dict:
         """

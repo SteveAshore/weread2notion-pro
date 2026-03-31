@@ -94,7 +94,15 @@ def main():
             print(f"更新热力图失败，没有添加热力图占位。具体参考：{HEATMAP_GUIDE}")
     else:
         print(f"更新热力图失败，没有生成热力图。具体参考：{HEATMAP_GUIDE}")
-    api_data = weread_api.get_api_data()
+    
+    # 获取阅读时间数据
+    try:
+        api_data = weread_api.get_api_data()
+    except Exception as e:
+        print(f"获取阅读时间数据失败: {e}")
+        print("跳过阅读时间同步")
+        return
+    
     readTimes = {int(key): value for key, value in api_data.get("readTimes").items()}
     now = pendulum.now("Asia/Shanghai").start_of("day")
     today_timestamp = now.int_timestamp
