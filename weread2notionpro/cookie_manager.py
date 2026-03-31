@@ -312,7 +312,7 @@ class CookieValidator:
     """
 
     WEREAD_BASE_URL = "https://weread.qq.com"
-    WEREAD_API_URL = "https://i.weread.qq.com"
+    WEREAD_API_URL = "https://weread.qq.com"  # 使用与 obsidian-weread-plugin 一致的域名
 
     def __init__(self, cookies: Dict[str, str], timeout: int = 10):
         """
@@ -342,22 +342,21 @@ class CookieValidator:
 
         try:
             # 验证端点：获取笔记本列表
-            # 使用更完整的浏览器请求头，模拟真实微信读书网页请求
+            # 使用与 obsidian-weread-plugin 一致的请求头
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
                 'Accept': 'application/json, text/plain, */*',
                 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Referer': 'https://weread.qq.com/web/reader',
-                'Origin': 'https://weread.qq.com',
-                'Connection': 'keep-alive',
+                'Accept-Encoding': 'gzip, deflate',
                 'Cookie': CookieUtil.cookies_to_string(self.cookies)
             }
 
-            logger.debug(f'验证 URL: {self.WEREAD_API_URL}/user/notebooks')
+            # 使用与 obsidian-weread-plugin 一致的验证端点
+            verify_url = f"{self.WEREAD_API_URL}/api/user/notebook"
+            logger.debug(f'验证 URL: {verify_url}')
             logger.debug(f'请求 Cookie 字段: {list(self.cookies.keys())}')
             response = requests.get(
-                f"{self.WEREAD_API_URL}/user/notebooks",
+                verify_url,
                 headers=headers,
                 timeout=self.timeout
             )
