@@ -278,20 +278,24 @@ class CookieCloudFetcher:
                 logger.error('CookieCloud 解密失败或数据为空')
                 return None
 
-            logger.debug(f'可用域名: {list(cookie_data.keys())}')
+            # CookieCloud 解密后的数据结构: {cookie_data: {...}, local_storage_data: {...}}
+            # 实际的 cookie 数据在 cookie_data 字段中
+            actual_cookie_data = cookie_data.get('cookie_data', cookie_data)
+            logger.debug(f'可用域名: {list(actual_cookie_data.keys())}')
 
-            # 提取 WeRead Cookie（精确匹配 weread.qq.com，与 obsidian 插件保持一致）
-            for domain, cookies in cookie_data.items():
+            # 提取 WeRead Cookie（匹配 weread.qq.com 结尾的域名，与 obsidian 插件保持一致）
+            for domain, cookies in actual_cookie_data.items():
                 if domain.endswith('weread.qq.com'):
                     cookie_str = "; ".join([
                         f"{c['name']}={c['value']}"
                         for c in cookies
                     ])
-                    logger.info(f'从 CookieCloud 成功获取 weread.qq.com 的 Cookie')
+                    logger.info(f'从 CookieCloud 成功获取 {domain} 的 Cookie')
                     logger.debug(f'Cookie 数量: {len(cookies)}')
                     return cookie_str
 
             logger.error('CookieCloud 中未找到 weread.qq.com 的 Cookie')
+            logger.debug(f'实际获取到的域名: {list(actual_cookie_data.keys())}')
             return None
 
         except requests.RequestException as e:
@@ -338,13 +342,20 @@ class CookieValidator:
 
         try:
             # 验证端点：获取笔记本列表
+            # 使用更完整的浏览器请求头，模拟真实微信读书网页请求
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': self.WEREAD_BASE_URL,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://weread.qq.com/web/reader',
+                'Origin': 'https://weread.qq.com',
+                'Connection': 'keep-alive',
                 'Cookie': CookieUtil.cookies_to_string(self.cookies)
             }
 
             logger.debug(f'验证 URL: {self.WEREAD_API_URL}/user/notebooks')
+            logger.debug(f'请求 Cookie 字段: {list(self.cookies.keys())}')
             response = requests.get(
                 f"{self.WEREAD_API_URL}/user/notebooks",
                 headers=headers,
