@@ -33,8 +33,8 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       YEAR: ${{ vars.YEAR }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -58,6 +58,7 @@ jobs:
               print('❌ Cookie 无效或获取失败')
               sys.exit(1)
           "
+
       - name: Remove folder
         run: rm -rf ./OUT_FOLDER
       - name: Set default year if not provided

@@ -89,27 +89,47 @@ class CookieCloudDecryptor:
         返回: 解密后的 Cookie 字典或 None
         """
         try:
-            # 生成解密密钥
+            # 生成解密密钥（与 obsidian 插件保持一致）
             key_source = f"{uuid}-{password}"
             md5_hash = hashlib.md5(key_source.encode()).hexdigest()
             key = md5_hash[:16].encode()  # 取前16个字符
+            logger.debug(f'解密密钥生成: MD5({key_source})[:16] = {md5_hash[:16]}')
 
             # Base64 解码
-            encrypted_data = base64.b64decode(encrypted)
+            try:
+                encrypted_data = base64.b64decode(encrypted)
+                logger.debug(f'Base64 解码成功，数据长度: {len(encrypted_data)}')
+            except Exception as e:
+                logger.error(f'Base64 解码失败: {e}')
+                return None
 
             # 提取 IV 和密文
+            if len(encrypted_data) < 16:
+                logger.error(f'加密数据太短，无法提取 IV: {len(encrypted_data)}')
+                return None
+
             iv = encrypted_data[:16]
             ciphertext = encrypted_data[16:]
+            logger.debug(f'IV 长度: {len(iv)}, 密文长度: {len(ciphertext)}')
 
             # AES 解密
-            cipher = AES.new(key, AES.MODE_CBC, iv)
-            decrypted_data = unpad(cipher.decrypt(ciphertext), AES.block_size)
+            try:
+                cipher = AES.new(key, AES.MODE_CBC, iv)
+                decrypted_padded = cipher.decrypt(ciphertext)
+                decrypted_data = unpad(decrypted_padded, AES.block_size)
+                logger.debug(f'AES 解密成功，数据长度: {len(decrypted_data)}')
+            except Exception as e:
+                logger.error(f'AES 解密失败: {e}')
+                return None
 
             # 解析 JSON
-            cookie_dict = json.loads(decrypted_data.decode('utf-8'))
-
-            logger.debug('CookieCloud 解密成功')
-            return cookie_dict
+            try:
+                cookie_dict = json.loads(decrypted_data.decode('utf-8'))
+                logger.debug(f'JSON 解析成功，域名数量: {len(cookie_dict)}')
+                return cookie_dict
+            except Exception as e:
+                logger.error(f'JSON 解析失败: {e}')
+                return None
 
         except Exception as e:
             logger.error(f'CookieCloud 解密失败: {e}')
@@ -142,40 +162,34 @@ class CookieCloudFetcher:
 
         流程:
         1. 验证参数完整性
-        2. 请求加密 Cookie 数据
-        3. 解密数据
+        2. GET 请求加密 Cookie 数据
+        3. 本地解密数据
         4. 提取 WeRead Cookie
 
         返回: Cookie 字符串或 None
         """
         # 验证参数
         if not self.server_url or not self.uuid or not self.password:
-            logger.error('CookieCloud 配置不完整')
+            logger.error('CookieCloud 配置不完整，请检查 CC_URL, CC_ID, CC_PASSWORD 环境变量')
             return None
 
         try:
-            # 请求加密数据（支持两种请求方式）
+            # 请求加密数据（使用 GET 请求，与 obsidian 插件保持一致）
             url = f"{self.server_url}/get/{self.uuid}"
+            logger.debug(f'请求 CookieCloud: {url}')
 
-            # 方式1: POST 请求（带密码在数据中）
-            response = requests.post(
-                url,
-                data={'password': self.password},
-                timeout=self.timeout
-            )
+            response = requests.get(url, timeout=self.timeout)
 
             if response.status_code != 200:
-                # 方式2: GET 请求（如果 POST 失败）
-                response = requests.get(url, timeout=self.timeout)
-
-            if response.status_code != 200:
-                logger.error(f'CookieCloud 请求失败: {response.status_code}')
+                logger.error(f'CookieCloud 请求失败: HTTP {response.status_code}')
                 return None
 
             data = response.json()
+            logger.debug(f'CookieCloud 响应: {data.keys()}')
 
             # 检查返回数据格式（新格式：encrypted + 解密）
             if 'encrypted' in data:
+                logger.debug('检测到加密数据，开始解密...')
                 cookie_data = CookieCloudDecryptor.decrypt_cookies(
                     self.uuid,
                     data['encrypted'],
@@ -183,25 +197,30 @@ class CookieCloudFetcher:
                 )
             # 检查旧格式（直接 cookie_data）
             elif 'cookie_data' in data:
+                logger.debug('检测到明文 cookie_data')
                 cookie_data = data['cookie_data']
             else:
-                logger.error('CookieCloud 响应格式不正确')
+                logger.error(f'CookieCloud 响应格式不正确，可用字段: {data.keys()}')
                 return None
 
             if not cookie_data:
+                logger.error('CookieCloud 解密失败或数据为空')
                 return None
 
-            # 提取 WeRead Cookie
+            logger.debug(f'可用域名: {list(cookie_data.keys())}')
+
+            # 提取 WeRead Cookie（精确匹配 weread.qq.com，与 obsidian 插件保持一致）
             for domain, cookies in cookie_data.items():
-                if 'weread' in domain.lower():
+                if domain.endswith('weread.qq.com'):
                     cookie_str = "; ".join([
                         f"{c['name']}={c['value']}"
                         for c in cookies
                     ])
-                    logger.info('从 CookieCloud 成功获取 Cookie')
+                    logger.info(f'从 CookieCloud 成功获取 weread.qq.com 的 Cookie')
+                    logger.debug(f'Cookie 数量: {len(cookies)}')
                     return cookie_str
 
-            logger.error('CookieCloud 中未找到 WeRead Cookie')
+            logger.error('CookieCloud 中未找到 weread.qq.com 的 Cookie')
             return None
 
         except requests.RequestException as e:
@@ -217,8 +236,8 @@ class CookieValidator:
     Cookie 有效性验证器
     """
 
-    WEREAD_BASE_URL = "<https://weread.qq.com>"
-    WEREAD_API_URL = "<https://i.weread.qq.com>"
+    WEREAD_BASE_URL = "https://weread.qq.com"
+    WEREAD_API_URL = "https://i.weread.qq.com"
 
     def __init__(self, cookies: Dict[str, str], timeout: int = 10):
         """
@@ -242,30 +261,40 @@ class CookieValidator:
             logger.warning('Cookie 为空')
             return False
 
+        # 检查关键 cookie 是否存在
+        if 'wr_vid' not in self.cookies:
+            logger.warning('Cookie 中缺少 wr_vid（用户ID），可能未登录')
+
         try:
             # 验证端点：获取笔记本列表
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Referer': self.WEREAD_BASE_URL,
                 'Cookie': CookieUtil.cookies_to_string(self.cookies)
             }
 
+            logger.debug(f'验证 URL: {self.WEREAD_API_URL}/user/notebooks')
             response = requests.get(
                 f"{self.WEREAD_API_URL}/user/notebooks",
                 headers=headers,
                 timeout=self.timeout
             )
 
+            logger.debug(f'验证响应状态: HTTP {response.status_code}')
+
             if response.status_code == 200:
                 data = response.json()
                 # 检查是否包含有效的笔记本信息
                 if data.get('books') is not None:
-                    logger.info('Cookie 验证成功')
+                    logger.info(f'Cookie 验证成功，找到 {len(data.get("books", []))} 本笔记本')
                     return True
                 else:
                     errcode = data.get('errcode', 0)
+                    errmsg = data.get('errmsg', '未知错误')
                     if errcode in [-2012, -2010]:
-                        logger.warning('Cookie 已过期（错误码: %s）', errcode)
+                        logger.warning(f'Cookie 已过期（错误码: {errcode}, 信息: {errmsg}）')
+                    else:
+                        logger.warning(f'Cookie 验证失败（错误码: {errcode}, 信息: {errmsg}）')
                     return False
 
             logger.warning(f'Cookie 验证返回状态码: {response.status_code}')
@@ -299,7 +328,7 @@ class CookieManager:
         1. 如果 force_refresh=True，强制刷新
         2. 如果已缓存且有效，直接返回
         3. 尝试从 CookieCloud 获取
-        4. 回退到环境变量
+        4. 回退到环境变量 WEREAD_COOKIE
 
         参数:
             force_refresh: 是否强制刷新
@@ -311,27 +340,40 @@ class CookieManager:
             logger.debug('返回已缓存的有效 Cookie')
             return self.cookies_dict
 
+        logger.info('开始获取 Cookie...')
+
         # 尝试从 CookieCloud 获取
         cookie_str = self._try_get_from_cookiecloud()
 
-        # 如果 CookieCloud 失败，回退到环境变量
-        if not cookie_str:
+        if cookie_str:
+            logger.info('从 CookieCloud 获取到 Cookie')
+        else:
+            logger.info('CookieCloud 获取失败，尝试从环境变量获取...')
+            # 如果 CookieCloud 失败，回退到环境变量
             cookie_str = os.getenv('WEREAD_COOKIE')
+            if cookie_str:
+                logger.info('从环境变量 WEREAD_COOKIE 获取到 Cookie')
 
         if not cookie_str:
-            logger.error('未能获取到有效的 Cookie')
+            logger.error('未能获取到有效的 Cookie，请检查：\n'
+                        '1. CookieCloud 配置 (CC_URL, CC_ID, CC_PASSWORD)\n'
+                        '2. 环境变量 WEREAD_COOKIE')
             return None
 
         # 解析 Cookie
         self.cookies_dict = CookieUtil.parse_cookie_string(cookie_str)
         self.last_update_time = datetime.now()
+        logger.debug(f'Cookie 解析成功，共 {len(self.cookies_dict)} 个字段')
 
         # 验证 Cookie 有效性
+        logger.info('正在验证 Cookie 有效性...')
         validator = CookieValidator(self.cookies_dict)
         self.is_valid = validator.verify_cookie_validity()
 
-        if not self.is_valid:
-            logger.warning('获取的 Cookie 无效')
+        if self.is_valid:
+            logger.info('Cookie 验证通过')
+        else:
+            logger.warning('Cookie 验证失败，可能已过期')
 
         return self.cookies_dict
 
@@ -341,12 +383,22 @@ class CookieManager:
 
         返回: Cookie 字符串或 None
         """
-        server_url = os.getenv('CC_URL', '<https://cookiecloud.malinkang.com>')
+        # 从环境变量读取配置
+        server_url = os.getenv('CC_URL', 'https://cookiecloud.malinkang.com')
         uuid = os.getenv('CC_ID')
         password = os.getenv('CC_PASSWORD')
 
+        logger.debug(f'CookieCloud 配置: URL={server_url}, UUID={uuid[:8] if uuid else None}...')
+
         if not all([server_url, uuid, password]):
-            logger.debug('CookieCloud 配置不完整，跳过')
+            missing = []
+            if not server_url:
+                missing.append('CC_URL')
+            if not uuid:
+                missing.append('CC_ID')
+            if not password:
+                missing.append('CC_PASSWORD')
+            logger.warning(f'CookieCloud 配置不完整，缺少: {", ".join(missing)}')
             return None
 
         fetcher = CookieCloudFetcher(server_url, uuid, password)

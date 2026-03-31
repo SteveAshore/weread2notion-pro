@@ -17,15 +17,15 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-WEREAD_URL = "<https://weread.qq.com/>"
-WEREAD_NOTEBOOKS_URL = "<https://i.weread.qq.com/user/notebooks>"
-WEREAD_BOOKMARKLIST_URL = "<https://i.weread.qq.com/book/bookmarklist>"
-WEREAD_CHAPTER_INFO = "<https://i.weread.qq.com/book/chapterInfos>"
-WEREAD_READ_INFO_URL = "<https://i.weread.qq.com/book/readinfo>"
-WEREAD_REVIEW_LIST_URL = "<https://i.weread.qq.com/review/list>"
-WEREAD_BOOK_INFO = "<https://i.weread.qq.com/book/info>"
-WEREAD_READDATA_DETAIL = "<https://i.weread.qq.com/readdata/detail>"
-WEREAD_HISTORY_URL = "<https://i.weread.qq.com/readdata/summary?synckey=0>"
+WEREAD_URL = "https://weread.qq.com/"
+WEREAD_NOTEBOOKS_URL = "https://i.weread.qq.com/user/notebooks"
+WEREAD_BOOKMARKLIST_URL = "https://i.weread.qq.com/book/bookmarklist"
+WEREAD_CHAPTER_INFO = "https://i.weread.qq.com/book/chapterInfos"
+WEREAD_READ_INFO_URL = "https://i.weread.qq.com/book/readinfo"
+WEREAD_REVIEW_LIST_URL = "https://i.weread.qq.com/review/list"
+WEREAD_BOOK_INFO = "https://i.weread.qq.com/book/info"
+WEREAD_READDATA_DETAIL = "https://i.weread.qq.com/readdata/detail"
+WEREAD_HISTORY_URL = "https://i.weread.qq.com/readdata/summary?synckey=0"
 
 
 class WeReadApi:
@@ -47,11 +47,14 @@ class WeReadApi:
         logger.info('开始刷新 Cookie...')
 
         # 强制从 CookieCloud 获取新 Cookie
-        self.cookie = self.cookie_manager.get_cookies(force_refresh=True)
+        cookies = self.cookie_manager.get_cookies(force_refresh=True)
 
-        if not self.cookie:
+        if not cookies:
             logger.error('无法获取新 Cookie')
             return False
+
+        # 更新 cookie 字符串
+        self.cookie = self.cookie_manager.get_cookies_string()
 
         # 更新 session
         self.session.cookies = self.cookie_manager.get_cookiejar()
