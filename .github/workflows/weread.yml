@@ -61,10 +61,49 @@ jobs:
               print('❌ Cookie 无效或获取失败')
               sys.exit(1)
           "
-      - name: weread book sync
-        run: |
-          book
-      - name: weread sync
-        run: |
-          weread
       
+      - name: weread book sync
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python -c "
+          import logging
+          import traceback
+          import sys
+          
+          # 设置详细日志
+          logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          
+          try:
+              print('🚀 开始同步书架...')
+              from weread2notionpro.book import main
+              main()
+              print('✅ 书架同步完成')
+          except Exception as e:
+              print(f'❌ 书架同步失败: {e}')
+              traceback.print_exc()
+              sys.exit(1)
+          "
+          
+      - name: weread sync
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python -c "
+          import logging
+          import traceback
+          import sys
+          
+          # 设置详细日志
+          logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          
+          try:
+              print('🚀 开始同步笔记...')
+              from weread2notionpro.weread import main
+              main()
+              print('✅ 笔记同步完成')
+          except Exception as e:
+              print(f'❌ 笔记同步失败: {e}')
+              traceback.print_exc()
+              sys.exit(1)
+          "
