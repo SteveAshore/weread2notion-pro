@@ -22,6 +22,7 @@ WEREAD_NOTEBOOKS_URL = "https://weread.qq.com/api/user/notebook"
 WEREAD_BOOKMARKLIST_URL = "https://weread.qq.com/web/book/bookmarklist"
 WEREAD_CHAPTER_INFO = "https://weread.qq.com/web/book/chapterInfos"
 WEREAD_READ_INFO_URL = "https://weread.qq.com/web/book/readinfo"
+WEREAD_PROGRESS_URL = "https://weread.qq.com/web/book/getProgress"
 WEREAD_REVIEW_LIST_URL = "https://weread.qq.com/web/review/list"
 WEREAD_BOOK_INFO = "https://weread.qq.com/web/book/info"
 WEREAD_READDATA_DETAIL = "https://weread.qq.com/web/readdata/detail"
@@ -252,12 +253,28 @@ class WeReadApi:
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def get_read_info(self, bookId):
-        """获取阅读信息"""
+        """获取阅读信息（使用新的 getProgress API）"""
         self.session.get(WEREAD_URL)
+        
+        # 使用新的 getProgress API 获取阅读进度和时间
         params = {"bookId": bookId}
-        r = self.session.get(WEREAD_READ_INFO_URL, params=params)
+        r = self.session.get(WEREAD_PROGRESS_URL, params=params)
+        
         if r.ok:
-            return r.json()
+            data = r.json()
+            # 转换新 API 格式为旧格式，保持兼容性
+            if data and "book" in data:
+                book_data = data.get("book", {})
+                return {
+                    "readingTime": book_data.get("readingTime", 0),
+                    "readingProgress": book_data.get("progress", 0),
+                    "markedStatus": book_data.get("markedStatus", 1),
+                    "totalReadDay": book_data.get("totalReadDay", 0),
+                    "beginReadingDate": book_data.get("startReadingTime"),
+                    "lastReadingDate": book_data.get("finishTime"),
+                    "finishedDate": book_data.get("finishTime") if book_data.get("markedStatus") == 4 else None,
+                }
+            return data
         else:
             errcode = r.json().get("errcode", 0)
             self.handle_errcode(errcode)
