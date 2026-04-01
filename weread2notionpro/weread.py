@@ -251,7 +251,14 @@ def main():
                 continue
             pageId = notion_books.get(bookId).get("pageId")
             print(f"正在同步《{title}》,一共{len(books)}本，当前是第{index+1}本。")
-            chapter = weread_api.get_chapter_info(bookId)
+            chapter_data = weread_api.get_chapter_info(bookId)
+            # 处理章节数据格式: {data: [{updated: [...]}]} -> {chapterUid: chapterInfo}
+            chapter = {}
+            if chapter_data and "data" in chapter_data:
+                data_list = chapter_data.get("data", [])
+                if data_list:
+                    for ch in data_list[0].get("updated", []):
+                        chapter[ch.get("chapterUid")] = ch
             bookmark_list = get_bookmark_list(pageId, bookId)
             reviews = get_review_list(pageId,bookId)
             bookmark_list.extend(reviews)

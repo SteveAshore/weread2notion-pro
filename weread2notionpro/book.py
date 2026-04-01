@@ -160,12 +160,20 @@ def main():
     global archive_dict
     bookshelf_books = weread_api.get_bookshelf()
     notion_books = notion_helper.get_all_book()
-    bookProgress = bookshelf_books.get("bookProgress")
+    
+    print(f"从微信读书获取到 {len(bookshelf_books.get('books', []))} 本书")
+    print(f"Notion 中已有 {len(notion_books)} 本书")
+    
+    bookProgress = bookshelf_books.get("bookProgress", [])
     bookProgress = {book.get("bookId"): book for book in bookProgress}
-    for archive in bookshelf_books.get("archive"):
+    
+    # 处理书架分类
+    for archive in bookshelf_books.get("archive", []):
         name = archive.get("name")
-        bookIds = archive.get("bookIds")
+        bookIds = archive.get("bookIds", [])
         archive_dict.update({bookId: name for bookId in bookIds})
+    
+    # 计算不需要同步的书籍
     not_need_sync = []
     for key, value in notion_books.items():
         if (
@@ -181,11 +189,23 @@ def main():
             )
         ):
             not_need_sync.append(key)
+    
+    print(f"不需要同步的书籍: {len(not_need_sync)} 本")
+    
+    # 获取笔记本列表和书架列表
     notebooks = weread_api.get_notebooklist()
     notebooks = [d["bookId"] for d in notebooks if "bookId" in d]
-    books = bookshelf_books.get("books")
+    books = bookshelf_books.get("books", [])
     books = [d["bookId"] for d in books if "bookId" in d]
+    
+    print(f"笔记本列表: {len(notebooks)} 本")
+    print(f"书架列表: {len(books)} 本")
+    
+    # 合并并过滤
     books = list((set(notebooks) | set(books)) - set(not_need_sync))
+    
+    print(f"需要同步的书籍: {len(books)} 本")
+    
     for index, bookId in enumerate(books):
         insert_book_to_notion(books, index, bookId)
 
