@@ -28,6 +28,7 @@ jobs:
       WEEK_DATABASE_NAME: ${{ vars.WEEK_DATABASE_NAME }}
       MONTH_DATABASE_NAME: ${{ vars.MONTH_DATABASE_NAME }}
       DAY_DATABASE_NAME: ${{ vars.DAY_DATABASE_NAME }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
       REF: ${{ github.ref }}
       REPOSITORY: ${{ github.repository }}
     steps:
@@ -71,8 +72,11 @@ jobs:
           import traceback
           import sys
           
-          # 设置详细日志
-          logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          # 设置日志级别
+          import os
+          log_level = os.getenv('LOG_LEVEL', 'INFO')
+          logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          print(f'📊 日志级别: {log_level}')
           
           try:
               print('🚀 开始同步书架...')
@@ -94,8 +98,11 @@ jobs:
           import traceback
           import sys
           
-          # 设置详细日志
-          logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          # 设置日志级别
+          import os
+          log_level = os.getenv('LOG_LEVEL', 'INFO')
+          logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+          print(f'📊 日志级别: {log_level}')
           
           try:
               print('🚀 开始同步笔记...')
