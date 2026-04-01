@@ -80,7 +80,7 @@ jobs:
           
           try:
               print('🚀 开始同步书架...')
-              from weread2notionpro.book import main
+              from weread2notionpro.book_copy import main
               main()
               print('✅ 书架同步完成')
           except Exception as e:
