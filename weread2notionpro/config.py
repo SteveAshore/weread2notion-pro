@@ -1,4 +1,6 @@
-
+# -*- coding: utf-8 -*-
+# 设置图书数据库的一些常量和配置项
+# 不需要更新的字段："书名", "BookId", "ISBN", "链接", "作者", "简介", "豆瓣链接"
 RICH_TEXT = "rich_text"
 URL = "url"
 RELATION = "relation"

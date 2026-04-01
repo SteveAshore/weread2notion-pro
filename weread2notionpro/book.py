@@ -22,34 +22,32 @@ def insert_book_to_notion(books, index, bookId):
     if bookInfo != None:
         book.update(bookInfo)
     readInfo = weread_api.get_read_info(bookId)
-    # 研究了下这个状态不知道什么情况有的虽然读了状态还是1 markedStatus = 1 想读 4 读完 其他为在读
     readInfo.update(readInfo.get("readDetail", {}))
     readInfo.update(readInfo.get("bookInfo", {}))
     book.update(readInfo)
-    book["阅读进度"] = (
-        100 if (book.get("markedStatus") == 4) else (book.get("readingProgress") or 0)
-    ) / 100
+    book["阅读进度"] = book.get("progress") or 0
     markedStatus = book.get("markedStatus")
     status = "想读"
     if markedStatus == 4:
         status = "已读"
-    elif (book.get("readingTime") or 0) >= 60:
+    elif markedStatus == 2:
         status = "在读"
     book["阅读状态"] = status
     book["阅读时长"] = book.get("readingTime") or 0
-    book["阅读天数"] = book.get("totalReadDay") or 0
+    book["最后阅读时间"] = book.get("finishTime") or book.get("updateTime") or 0
+    book["开始阅读时间"] = book.get("startReadingTime") or book.get("beginReadingTime") or 0
+    # 阅读天数的逻辑是计算最后阅读时间 - 开始阅读时间的天数，如果没有开始阅读就用0代替
+    book["阅读天数"] = pendulum.from_timestamp(book["最后阅读时间"]).diff(pendulum.from_timestamp(book["开始阅读时间"])).in_days() if book.get("开始阅读时间") else 0
     book["评分"] = book.get("newRating")
     if book.get("newRatingDetail") and book.get("newRatingDetail").get("myRating"):
         book["我的评分"] = rating.get(book.get("newRatingDetail").get("myRating"))
     elif status == "已读":
         book["我的评分"] = "未评分"
-    book["时间"] = (
-        book.get("finishedDate")
-        or book.get("lastReadingDate")
-        or book.get("readingBookDate")
-    )
-    book["开始阅读时间"] = book.get("beginReadingDate")
-    book["最后阅读时间"] = book.get("lastReadingDate")
+    # book["时间"] = (
+    #     book.get("finishedDate")
+    #     or book.get("lastReadingDate")
+    #     or book.get("readingBookDate")
+    # )
     cover = (book.get("cover") or "").replace("/s_", "/t7_")
     if not cover or not cover.strip() or not cover.startswith("http"):
         cover = BOOK_ICON_URL

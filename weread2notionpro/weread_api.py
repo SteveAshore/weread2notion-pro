@@ -265,14 +265,31 @@ class WeReadApi:
             # 转换新 API 格式为旧格式，保持兼容性
             if data and "book" in data:
                 book_data = data.get("book", {})
+                
+                # 新 API 没有 markedStatus，需要根据其他字段推断
+                # finishTime > 0 表示已读完
+                # isStartReading == 1 表示已开始阅读
+                finish_time = book_data.get("finishTime", 0)
+                is_start_reading = book_data.get("isStartReading", 0)
+                progress = book_data.get("progress", 0)
+                reading_time = book_data.get("readingTime", 0)
+                
+                # 与现有框架中 markedStatus 保持一致，其中: 1=想读, 2=在读, 4=已读
+                if finish_time > 0:
+                    marked_status = 4  # 已读完
+                elif is_start_reading == 1 or progress > 0 or reading_time > 0:
+                    marked_status = 2  # 在读
+                else:
+                    marked_status = 1  # 想读
+                
                 return {
-                    "readingTime": book_data.get("readingTime", 0),
-                    "readingProgress": book_data.get("progress", 0),
-                    "markedStatus": book_data.get("markedStatus", 1),
-                    "totalReadDay": book_data.get("totalReadDay", 0),
+                    "readingTime": reading_time,
+                    "readingProgress": progress,
+                    "markedStatus": marked_status,
+                    "totalReadDay": 0,  # 新 API 不再提供此字段
                     "beginReadingDate": book_data.get("startReadingTime"),
-                    "lastReadingDate": book_data.get("finishTime"),
-                    "finishedDate": book_data.get("finishTime") if book_data.get("markedStatus") == 4 else None,
+                    "lastReadingDate": book_data.get("updateTime"),
+                    "finishedDate": finish_time if finish_time > 0 else None,
                 }
             return data
         else:
