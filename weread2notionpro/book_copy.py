@@ -169,6 +169,7 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     # 检查阅读时间是否变化
     old_time = notion_book.get("readingTime") or 0
     new_time = read_info.get("readingTime") or 0
+    print(f"old time: {old_time}, new time: {new_time}")
     
     if new_time > old_time:
         return True, f"阅读时间变化 ({old_time} -> {new_time})"
@@ -176,6 +177,7 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     # 检查阅读进度是否变化。 TODO: 确认notion_book中处理阅读进度的逻辑
     old_progress = (notion_book.get("阅读进度") or 0) * 100
     new_progress = read_info.get("readingProgress") or 0
+    print(f"old progress: {old_progress:.1f}, new progress: {new_progress:.1f}")
     
     if abs(new_progress - old_progress) > 1:  # 进度变化超过 1%
         return True, f"阅读进度变化 ({old_progress:.1f}% -> {new_progress:.1f}%)"
@@ -183,12 +185,14 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     # 检查笔记数量是否变化（如果有笔记数据）
     old_note_count = notion_book.get("noteCount", 0)
     new_note_count = read_info.get("noteCount") or 0
+    print(f"old note count: {old_note_count}, new note count: {new_note_count}")
     if old_note_count != new_note_count:
         return True, f"笔记数量变化 ({old_note_count} -> {new_note_count})"
     
     # 检查划线数量是否变化（如果有划线数据）
     old_bookmark_count = notion_book.get("bookmarkCount", 0)
     new_bookmark_count = read_info.get("bookmarkCount", 0)
+    print(f"old bookmark count: {old_bookmark_count}, new bookmark count: {new_bookmark_count}")
     if old_bookmark_count != new_bookmark_count:
         return True, f"划线数量变化 ({old_bookmark_count} -> {new_bookmark_count})"
 
@@ -415,7 +419,8 @@ def main():
         read_info = read_info_cache[book_id]
         notion_book = notion_books.get(book_id)
         should_sync, reason = should_sync_book(book_id, notion_book, book_info, read_info)
-        
+        print(f"  [{book_id}],{should_sync},{reason}")
+
         if not should_sync:
             skip_books.append((book_id, reason))
             continue
