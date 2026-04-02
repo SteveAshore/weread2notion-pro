@@ -411,6 +411,7 @@ def main():
         if book_id not in read_info_cache:
             try:
                 read_info_raw = weread_api.get_read_info(book_id)
+                print(f"[{book_id}]read_info_raw: {read_info_raw}")
                 read_info_cache[book_id] = parse_read_info(read_info_raw)
             except Exception as e:
                 print(f"  ⚠ 获取阅读信息失败 {book_id}: {e}")
