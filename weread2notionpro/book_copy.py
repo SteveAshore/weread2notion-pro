@@ -380,11 +380,12 @@ def main():
     all_books = merge_shelf_and_notebook(shelf_cache, notebook_list)
     print(f"  ✓ 合并后书籍: {len(all_books)} 本")
     
-    # 处理书架分类
+    # 处理书架分类（bookshelf 为 booksAndArchives 列表，archive 项为列表中的对象）
     archive_dict = {}
-    for archive in bookshelf.get("archive", []):
-        for book_id in archive.get("bookIds", []):
-            archive_dict[book_id] = archive.get("name")
+    for item in bookshelf:
+        if item.get("type") == "archive" or "bookIds" in item:
+            for book_id in item.get("bookIds", []):
+                archive_dict[book_id] = item.get("name")
     print(f"  ✓ 书架分类: {len(set(archive_dict.values()))} 个")
     
     # 2. 获取 Notion 已有书籍
