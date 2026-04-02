@@ -377,3 +377,8 @@ def download_image(url, save_dir="cover"):
 
 def get_embed(url):
     return {"type": "embed", "embed": {"url": url}}
+
+def get_days_between(start_timestamp, end_timestamp):
+    start_date = pendulum.from_timestamp(start_timestamp, tz="Asia/Shanghai").start_of('day')
+    end_date = pendulum.from_timestamp(end_timestamp, tz="Asia/Shanghai").start_of('day')
+    return (end_date - start_date).in_days()

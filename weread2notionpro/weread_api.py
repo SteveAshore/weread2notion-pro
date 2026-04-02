@@ -110,35 +110,14 @@ class WeReadApi:
             initial_state = json.loads(match.group(1))
             shelf_data = initial_state.get('shelf', {})
             
-            # 从 booksAndArchives 提取书籍（books 和 bookProgress 可能为空）
+            # 从 booksAndArchives 提取书籍（books 和 bookProgress 为空）
             books_and_archives = shelf_data.get('booksAndArchives', [])
             # 过滤出书籍类型（type 为 book 或有 bookId 的项）
-            books = [item for item in books_and_archives 
-                     if item.get('type') == 'book' or 'bookId' in item]
+            # 打印books_and_archives 以检查数据结构
+            print(len(books_and_archives))
+            print(books_and_archives)
             
-            # 构建 bookProgress（从书籍数据中提取阅读进度）
-            book_progress = []
-            for book in books:
-                progress = {
-                    'bookId': book.get('bookId'),
-                    'readingTime': book.get('readingTime', 0),
-                }
-                # 添加其他可能的进度字段
-                if 'readUpdateTime' in book:
-                    progress['readUpdateTime'] = book.get('readUpdateTime')
-                if 'finishReading' in book:
-                    progress['finishReading'] = book.get('finishReading')
-                book_progress.append(progress)
-            
-            # 转换为与原来 API 一致的格式
-            result = {
-                'books': books,
-                'archive': shelf_data.get('archive', []),
-                'bookProgress': book_progress,
-            }
-            
-            logger.info(f"成功获取书架: {len(result['books'])} 本书, {len(result['archive'])} 个分类")
-            return result
+            return books_and_archives
             
         except json.JSONDecodeError as e:
             logger.error(f'解析 window.__INITIAL_STATE__ 失败: {e}')
