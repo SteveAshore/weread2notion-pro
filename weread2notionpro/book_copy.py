@@ -104,21 +104,29 @@ def merge_shelf_and_notebook(shelf_cache, notebook_list):
 def parse_read_info(read_info):
     """
     解析阅读进度信息，统一字段名
+    输入: read_info 格式：
+    {
+        "readingTime": reading_time,
+        "readingProgress": progress,
+        "markedStatus": marked_status,
+        "totalReadDay": 0,  # 新 API 不再提供此字段
+        "beginReadingDate": book_data.get("startReadingTime"),
+        "lastReadingDate": book_data.get("updateTime"),
+        "finishedDate": finish_time if finish_time > 0 else None,
+    }
     
     新 API 返回格式: {book: {readingTime, progress, isStartReading, finishTime, ...}}
     """
-    if not read_info or "book" not in read_info:
+    if not read_info:
         return {}
     
-    book_data = read_info.get("book", {})
-    
     # 提取字段
-    readingTime = book_data.get("readingTime", 0)
-    progress = book_data.get("progress", 0)
-    isStartReading = book_data.get("isStartReading", 0)
-    finishTime = book_data.get("finishTime", 0)
-    startReadingTime = book_data.get("startReadingTime", 0)
-    updateTime = book_data.get("updateTime", 0)
+    readingTime = read_info.get("readingTime", 0)
+    progress = read_info.get("progress", 0)
+    isStartReading = read_info.get("isStartReading", 0)
+    finishTime = read_info.get("finishTime", 0)
+    startReadingTime = read_info.get("startReadingTime", 0)
+    updateTime = read_info.get("updateTime", 0)
     
     # 推断阅读状态: 1=想读, 2=在读, 4=已读
     if finishTime > 0:
