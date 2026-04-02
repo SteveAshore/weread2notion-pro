@@ -413,11 +413,13 @@ def main():
                 read_info_raw = weread_api.get_read_info(book_id)
                 print(f"[{book_id}]read_info_raw: {read_info_raw}")
                 read_info_cache[book_id] = parse_read_info(read_info_raw)
+                print(f"[{book_id}]read_info_cache: {read_info_cache}")
             except Exception as e:
                 print(f"  ⚠ 获取阅读信息失败 {book_id}: {e}")
                 read_info_cache[book_id] = {}
         
         read_info = read_info_cache[book_id]
+        print(f"[{book_id}]read_info: {read_info}")
         notion_book = notion_books.get(book_id)
         should_sync, reason = should_sync_book(book_id, notion_book, book_info, read_info)
         print(f"  [{book_id}],{should_sync},{reason}")
