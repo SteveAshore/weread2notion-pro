@@ -430,6 +430,7 @@ def main():
         if notion_book is None:
             new_books.append((book_id, book_data))
         else:
+            print(f"[{book_id}] in Notion:{notion_book}")
             update_books.append((book_id, notion_book.get("pageId"), book_data))
     
     print(f"  ✓ 新书: {len(new_books)} 本")
