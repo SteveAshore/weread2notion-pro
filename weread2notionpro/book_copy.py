@@ -130,9 +130,9 @@ def parse_read_info(read_info):
 
     # totalReadDay 处理逻辑
     totalReadDay = 0
-    if startReadingTime > 0 and finishTime > 0:     # 阅读完的书籍
+    if isStartReading == 1 and readingProgress == 100:     # 阅读完的书籍
         totalReadDay = utils.get_days_between(startReadingTime, finishTime)
-    elif startReadingTime > 0 and updateTime > 0:   # 在读的书籍
+    elif isStartReading == 1:   # 在读的书籍
         totalReadDay = utils.get_days_between(startReadingTime, updateTime)
     else:
         totalReadDay = 0
