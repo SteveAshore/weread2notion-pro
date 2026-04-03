@@ -114,8 +114,6 @@ def parse_read_info(read_info):
         "lastReadingDate": book_data.get("updateTime"),
         "finishedDate": finish_time if finish_time > 0 else None,
     }
-    
-    新 API 返回格式: {book: {readingTime, progress, isStartReading, finishTime, ...}}
     """
     if not read_info:
         return {}
@@ -177,7 +175,6 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     # 检查阅读时间是否变化
     old_time = notion_book.get("readingTime") or 0
     new_time = read_info.get("readingTime") or 0
-    print(f"old time: {old_time}, new time: {new_time}")
     
     if new_time > old_time:
         return True, f"阅读时间变化 ({old_time} -> {new_time})"
@@ -185,7 +182,6 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     # 检查阅读进度是否变化。 TODO: 确认notion_book中处理阅读进度的逻辑
     old_progress = (notion_book.get("阅读进度") or 0) * 100
     new_progress = read_info.get("readingProgress") or 0
-    print(f"old progress: {old_progress:.1f}, new progress: {new_progress:.1f}")
     
     if abs(new_progress - old_progress) > 1:  # 进度变化超过 1%
         return True, f"阅读进度变化 ({old_progress:.1f}% -> {new_progress:.1f}%)"
@@ -193,14 +189,12 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     # 检查笔记数量是否变化（如果有笔记数据）
     old_note_count = notion_book.get("noteCount", 0)
     new_note_count = read_info.get("noteCount") or 0
-    print(f"old note count: {old_note_count}, new note count: {new_note_count}")
     if old_note_count != new_note_count:
         return True, f"笔记数量变化 ({old_note_count} -> {new_note_count})"
     
     # 检查划线数量是否变化（如果有划线数据）
     old_bookmark_count = notion_book.get("bookmarkCount", 0)
     new_bookmark_count = read_info.get("bookmarkCount", 0)
-    print(f"old bookmark count: {old_bookmark_count}, new bookmark count: {new_bookmark_count}")
     if old_bookmark_count != new_bookmark_count:
         return True, f"划线数量变化 ({old_bookmark_count} -> {new_bookmark_count})"
 
@@ -311,8 +305,8 @@ def create_book_page(book_id, book_data, notion_helper, weread_api):
             )
             for cat in book_data.get("categories")
         ]
-        properties["分类"] = utils.get_relation(category_ids)
-    
+        properties["分类"] = utils.get_relation(category_ids)   
+
     # 添加其他属性
     other_props = utils.get_properties(book_data, book_properties_type_dict)
     properties.update(other_props)
@@ -356,6 +350,8 @@ def update_book_page(book_id, page_id, book_data, notion_helper):
         ]
         properties["分类"] = utils.get_relation(category_ids)
     
+    print(f"[{book_id}]数据: {book_data}")
+    print(f"[{book_id}]更新属性: {properties}")
     # 更新页面（包含封面和图标）
     result = notion_helper.update_page(
         page_id=page_id,
