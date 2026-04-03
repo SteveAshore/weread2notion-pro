@@ -120,19 +120,13 @@ def parse_read_info(read_info):
     
     # 提取字段
     readingTime = read_info.get("readingTime", 0)
-    progress = read_info.get("progress", 0)
+    readingProgress = read_info.get("readingProgress", 0)
     isStartReading = read_info.get("isStartReading", 0)
-    finishTime = read_info.get("finishTime", 0)
-    startReadingTime = read_info.get("startReadingTime", 0)
-    updateTime = read_info.get("updateTime", 0)
+    finishTime = read_info.get("finishedDate", 0)
+    startReadingTime = read_info.get("beginReadingDate", 0)
+    updateTime = read_info.get("lastReadingDate", 0)
     
-    # 推断阅读状态: 1=想读, 2=在读, 4=已读
-    if finishTime > 0:
-        marked_status = 4  # 已读完
-    elif isStartReading == 1 or progress > 0 or readingTime > 0:
-        marked_status = 2  # 在读
-    else:
-        marked_status = 1  # 想读
+    marked_status = read_info.get("markedStatus", 1)  # 1=想读, 2=在读, 4=已读
 
     # totalReadDay 处理逻辑
     totalReadDay = 0
@@ -145,7 +139,7 @@ def parse_read_info(read_info):
     
     return {
         "readingTime": readingTime,
-        "readingProgress": progress,
+        "readingProgress": readingProgress,
         "markedStatus": marked_status,
         "totalReadDay": totalReadDay,  # 新 API 不再提供此字段，该字段为计算得出
         "startReadingTime": startReadingTime,
@@ -179,7 +173,7 @@ def should_sync_book(book_id, notion_book, shelf_book, read_info):
     if new_time > old_time:
         return True, f"阅读时间变化 ({old_time} -> {new_time})"
     
-    # 检查阅读进度是否变化。 TODO: 确认notion_book中处理阅读进度的逻辑
+    # 检查阅读进度是否变化。
     old_progress = (notion_book.get("阅读进度") or 0) * 100
     new_progress = read_info.get("readingProgress") or 0
     
@@ -208,7 +202,10 @@ def prepare_book_data(book_id, shelf_book, read_info, archive_name=None):
     合并书架数据和阅读信息，统一字段格式，并过滤掉原始 API 的冗余字段
     """
     # 合并数据（阅读信息优先级更高）
-    merge_book = {**shelf_book, **read_info}
+    merge_book_data = {**shelf_book, **read_info}
+    merge_book = {}
+    merge_book["BookId"] = merge_book_data.get("bookId")
+
     
     # 添加书架分类
     if archive_name:
@@ -263,11 +260,12 @@ def prepare_book_data(book_id, shelf_book, read_info, archive_name=None):
     if "sort" in merge_book:
         merge_book["Sort"] = merge_book.get("sort")
     
-    # 保留 create_book_page / update_book_page 需要的辅助键，其余过滤
-    allowed_keys = set(book_properties_type_dict.keys()) | {"title", "author", "categories", "cover", "isbn", "intro"}
-    clean_book = {k: v for k, v in merge_book.items() if k in allowed_keys}
+    merge_book["价格"] = merge_book.get("price")
+    merge_book["字数"] = merge_book.get("totalWords")
+    merge_book["章节"] = merge_book.get("lastChapterIdx")
     
-    return clean_book
+    
+    return merge_book
 
 
 def create_book_page(book_id, book_data, notion_helper, weread_api):
